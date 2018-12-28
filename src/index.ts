@@ -22,9 +22,17 @@ const getSample = (instrument,noteAndOctave) => {
   let [ , requestedNote, requestedOctave ] = /^(\w[b#]?)(\d)$/.exec(noteAndOctave);
   // requestedOctave = parseInt(requestedOctave, 10);
   requestedNote = flatToSharp(requestedNote);
-  console.log(requestedNote);
-  console.log(requestedOctave);
-}
+  const sampleBank = SAMPLE_LIBRARY[instrument];
+  const sample = getNearestSample(sampleBank, requestedNote, requestedOctave);
+  let distance =
+    getNoteDistance(requestedNote, requestedOctave, sample.note, sample.octave);
+
+  return fetchSample(sample.file)
+    .then(audioBuffer => ({
+      audioBuffer: audioBuffer,
+      distance: distance,
+    }));
+};
 
 const flatToSharp = (note) => {
   switch (note) {
@@ -56,8 +64,25 @@ const getNearestSample = (sampleBank, note, octave) => {
   return sortedBank[0];
 };
 
-const fetchSample = async (path) => {
+const fetchSample = (path) => {
   return fetch(encodeURIComponent(path))
   .then(res => res.arrayBuffer())
   .then(arrayBuffer => audioCtx.decodeAudioData(arrayBuffer));
+};
+
+const playSample = (instrument, note) => {
+  getSample(instrument, note)
+  .then(({audioBuffer, distance}) => {
+    const playbackRate = Math.pow(2, distance / 12);
+    const sourceNode = audioCtx.createBufferSource();
+    sourceNode.buffer = audioBuffer;
+    sourceNode.playbackRate.value = playbackRate;
+    sourceNode.connect(audioCtx.destination);
+    sourceNode.start();
+  })
+  .catch(e => { console.error(e); });
+};
+
+window.playSample = (note) => {
+  playSample('Grand Piano', note);
 };
