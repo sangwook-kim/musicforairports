@@ -1,4 +1,7 @@
 const audioCtx = new AudioContext();
+let loop;
+
+const destination = audioCtx.createConvolver();
 
 const OCTAVE = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const SAMPLE_LIBRARY = {
@@ -18,7 +21,7 @@ const SAMPLE_LIBRARY = {
   ],
 };
 
-const getSample = (instrument,noteAndOctave) => {
+const getSample = (instrument, noteAndOctave) => {
   let [ , requestedNote, requestedOctave ] = /^(\w[b#]?)(\d)$/.exec(noteAndOctave);
   // requestedOctave = parseInt(requestedOctave, 10);
   requestedNote = flatToSharp(requestedNote);
@@ -70,19 +73,50 @@ const fetchSample = (path) => {
   .then(arrayBuffer => audioCtx.decodeAudioData(arrayBuffer));
 };
 
-const playSample = (instrument, note) => {
+const playSample = (instrument, note, delaySeconds = 0) => {
   getSample(instrument, note)
   .then(({audioBuffer, distance}) => {
     const playbackRate = Math.pow(2, distance / 12);
     const sourceNode = audioCtx.createBufferSource();
     sourceNode.buffer = audioBuffer;
     sourceNode.playbackRate.value = playbackRate;
-    sourceNode.connect(audioCtx.destination);
-    sourceNode.start();
+    sourceNode.connect(destination);
+    sourceNode.start(audioCtx.currentTime + delaySeconds);
   })
   .catch(e => { console.error(e); });
 };
 
+const playLoop = (instrument, note, loopLengthInSec, delaySeconds) => {
+  playSample(instrument, note, delaySeconds);
+  loop = setInterval(() => playSample(instrument, note, delaySeconds), loopLengthInSec * 1000);
+}
+
+/*
 window.playSample = (note) => {
   playSample('Grand Piano', note);
 };
+
+window.playLoop = (note, loopLengthInSec, delaySeconds) => {
+  playLoop('Grand Piano', note, loopLengthInSec, delaySeconds);
+}
+*/
+
+window.playAirPortMusic = () => {
+  playLoop('Grand Piano', 'F4',  19.7, 4.0);
+  playLoop('Grand Piano', 'Ab4', 17.8, 8.1);
+  playLoop('Grand Piano', 'C5',  21.3, 5.6);
+  playLoop('Grand Piano', 'Db5', 22.1, 12.6);
+  playLoop('Grand Piano', 'Eb5', 18.4, 9.2);
+  playLoop('Grand Piano', 'F5',  20.0, 14.1);
+  playLoop('Grand Piano', 'Ab5', 17.7, 3.1);
+}
+
+fetchSample('AirportTerminal.wav')
+.then(convolverBuffer => {
+  destination.buffer = convolverBuffer;
+  destination.connect(audioCtx.destination);
+})
+.catch(e => {
+  console.error(e);
+});
+
